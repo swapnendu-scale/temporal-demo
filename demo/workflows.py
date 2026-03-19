@@ -23,19 +23,18 @@ class KitchenWorkflow:
 class PizzaOrderWorkflow:
     @workflow.run
     async def process_order(self, pizza_type: str, address: str, amount: int) -> str:
-        # INTENTIONAL BUG 1: Non-deterministic code inside a workflow.
-        # Workflows must be deterministic. Using uuid.uuid4() or requests.get() 
-        # directly in the workflow code will break Temporal's replay mechanism.
-        # This should be done inside an Activity or using workflow.uuid4().
+        # FIXED: We use workflow.uuid4() to generate a deterministic UUID.
+        # This guarantees that if the workflow is replayed, it will generate the same UUID.
         
-        order_id = str(uuid.uuid4())
+        order_id = str(workflow.uuid4())
         
         workflow.logger.info(f"Starting pizza order {order_id}")
         
         # 1. Charge the customer (Activity)
+        # We pass the order_id so the activity can be idempotent
         await workflow.execute_activity(
             charge_customer,
-            amount,
+            args=[amount, order_id],
             start_to_close_timeout=timedelta(seconds=10),
         )
         

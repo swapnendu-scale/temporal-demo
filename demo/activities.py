@@ -3,17 +3,22 @@ import time
 from temporalio import activity
 
 @activity.defn
-async def charge_customer(amount: int) -> str:
+async def charge_customer(amount: int, order_id: str) -> str:
     """
     Simulates charging a customer.
     """
-    # INTENTIONAL BUG 2: Non-idempotent activity that randomly fails.
-    # Temporal will retry this activity on failure. Because it appends to a file
-    # *before* the potential failure, retries will result in duplicate charges!
-    # In a real system, this could mean charging a credit card multiple times.
+    # This activity is now idempotent.
+    # We check if the order_id has already been processed before charging.
     
+    try:
+        with open("charges.txt", "r") as f:
+            if f"Order {order_id}" in f.read():
+                return f"Already charged ${amount} for {order_id}"
+    except FileNotFoundError:
+        pass # File doesn't exist yet, that's fine
+
     with open("charges.txt", "a") as f:
-        f.write(f"Charged ${amount}\n")
+        f.write(f"Order {order_id}: Charged ${amount}\n")
     
     # Simulate some processing time
     time.sleep(1)
