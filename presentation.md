@@ -26,10 +26,11 @@ Temporal is the silent engine powering our most critical applications:
 - **Other IPS Applications:** Handling complex, multi-step data processing pipelines.
 
 ### AI & Temporal: The "Vibe-Coding" Dilemma
-- AI tools (Cursor, Copilot) are incredible at generating the "how" (the syntax).
-- However, Temporal has strict, unforgiving rules (like determinism). 
-- If you use AI to write Temporal code without understanding the "what" and "why", you will generate code that looks correct but fails catastrophically in production.
-- **Our Goal Today:** Give you the foundational understanding needed to guide AI effectively and debug the results.
+- **The New Reality:** AI tools (Cursor, Copilot) write the bulk of our code. They are incredible at generating the "how" (the syntax).
+- **The Danger:** Temporal has strict, unforgiving rules. LLMs will confidently hallucinate non-deterministic workflows or bundle API calls directly into workflow code.
+- **The Modern Engineer's Job:** You are no longer just typing code; you are the architect and the reviewer. You must know the best practices for **Workflows, Activities, Workers, Task Queues, and Idempotency**.
+- If you "vibe-code" Temporal without this foundation, you will generate code that looks correct locally but fails catastrophically in production.
+- **Our Goal Today:** Equip you with the architectural intuition to guide AI effectively, spot its Temporal anti-patterns, and debug the results.
 
 ---
 
@@ -122,7 +123,7 @@ flowchart LR
 **[🎬 CUE: Presenter switches to IDE and Terminal]**
 
 **The Setup:**
-We will now run the workflow we just discussed. It contains two intentional, very common bugs:
+We will now run the workflow we just discussed. It contains two intentional, very common bugs. **In fact, this is exactly the kind of code an LLM will generate by default if you don't prompt it carefully:**
 1. **The Determinism Bug:** An API call made directly inside the workflow code.
 2. **The Idempotency Bug:** A failing activity that charges a customer without checking if they were already charged.
 
@@ -145,7 +146,7 @@ We will now run the workflow we just discussed. It contains two intentional, ver
 
 ## 6. IPS Implementation Critique & Best Practices (10 mins)
 
-*A blameless review of existing IPS code across different applications to learn how we can improve our Temporal usage.*
+*A blameless review of existing IPS code across different applications. Think of these not just as past mistakes, but as **default AI behaviors** that you, as the architect, must learn to spot and correct during PR reviews.*
 
 ### Critique 1: Sequential Activity Execution (Failing to Fan-Out)
 
@@ -196,6 +197,7 @@ flowchart TD
 
 **Q: Can I use `datetime.now()` in a workflow?**
 - **No.** It is non-deterministic. If the workflow replays tomorrow, `datetime.now()` will return a different value, breaking the replay. You must use `workflow.now()` which returns the deterministic time recorded in the event history.
+- *Pro-tip:* This is the #1 most common hallucination Copilot/Cursor makes when writing Temporal workflows. Always `Ctrl+F` for `datetime.now()` when reviewing AI-generated Temporal code.
 
 ---
 
