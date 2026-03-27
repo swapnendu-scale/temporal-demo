@@ -33,8 +33,9 @@ class PizzaOrderWorkflow:
 
     @workflow.run
     async def process_order(self, customer_name: str, pizza_type: str, address: str, amount: int) -> str:
-        # FIXED: workflow.uuid4() is deterministic across replays
-        order_id = str(workflow.uuid4())
+        # BUG: uuid.uuid4() is non-deterministic and breaks Temporal replay.
+        # Should use workflow.uuid4() instead.
+        order_id = str(uuid.uuid4())
 
         workflow.logger.info(f"Starting pizza order {order_id} for {customer_name}")
 
@@ -42,7 +43,7 @@ class PizzaOrderWorkflow:
         self._stage = "charging"
         await workflow.execute_activity(
             charge_customer,
-            args=[amount, order_id],
+            amount,
             start_to_close_timeout=timedelta(seconds=30),
         )
 
