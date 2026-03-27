@@ -125,23 +125,21 @@ flowchart LR
 **The Setup:**
 We will now run the workflow we just discussed. It contains two intentional, very common bugs. **This is exactly the kind of code an LLM will generate by default if you don't prompt it carefully.**
 
-**[🎬 CUE: Presenter runs `just broken` and opens the Pizza UI]**
+**[🎬 CUE: Presenter runs `just demo` and opens the Pizza UI]**
 **[🎬 CUE: Presenter places an order through the UI, then switches to Temporal Web UI]**
 
 ### Bug 1: The Determinism Bug (`RestrictedWorkflowAccessError`)
 - The workflow uses `uuid.uuid4()` to generate an order ID inside the workflow code.
 - Temporal's Python SDK has a **sandbox** that detects non-deterministic calls and blocks them immediately.
 - The workflow fails with: `RestrictedWorkflowAccessError: Cannot access uuid.uuid4.__call__ from inside a workflow.`
-- **The Fix:** Replace `uuid.uuid4()` with `workflow.uuid4()`, which returns a deterministic UUID seeded from the workflow's event history. On replay, it returns the same value.
+- **The Live Fix:** In `workflows.py`, comment out `order_id = str(uuid.uuid4())` and uncomment `order_id = workflow.info().workflow_id`. Delete the `import uuid` line. Save -- uvicorn auto-reloads.
 
 ### Bug 2: The Idempotency Bug (Double Charging)
 - After fixing Bug 1, the workflow runs. But look at the **Payment Ledger** in the UI.
 - The `charge_customer` activity writes the charge to `charges.txt` and randomly fails 75% of the time. When Temporal retries it, the same order ID gets charged again.
 - The ledger shows the same order ID appearing multiple times -- the customer is being double-charged!
-- **The Fix:** Add an idempotency check at the top of the activity: if the order ID is already in `charges.txt`, return immediately without writing.
-
-**[🎬 CUE: Presenter live-fixes the code, then runs `just fixed` to show the clean version]**
-- Show how the Payment Ledger now has exactly one charge per order, even though the activity still fails and retries.
+- **The Live Fix:** In `activities.py`, uncomment the idempotency check block at the top of `charge_customer`. Save -- uvicorn auto-reloads.
+- The Payment Ledger now shows exactly one charge per order, even though the activity still fails and retries.
 
 ---
 

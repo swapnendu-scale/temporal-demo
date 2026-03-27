@@ -2,22 +2,10 @@
 server:
 	temporal server start-dev
 
-# Run the broken version of the demo
-broken: _ensure-server
-	@echo "🍕 Setting up BROKEN demo..."
-	git checkout demo/broken -- demo/workflows.py demo/activities.py
-	-@git reset HEAD demo/workflows.py demo/activities.py >/dev/null 2>&1
+# Run the demo (Pizza Delivery App)
+demo: _ensure-server
 	@cd demo && rm -f charges.txt
-	@echo "🚀 Starting backend (FastAPI + Worker) and frontend..."
-	@bash -c 'trap "kill 0" EXIT; cd demo && uv run api.py & cd demo/frontend && npm run dev & wait'
-
-# Run the fixed version of the demo
-fixed: _ensure-server
-	@echo "🍕 Setting up FIXED demo..."
-	git checkout demo/fixed -- demo/workflows.py demo/activities.py
-	-@git reset HEAD demo/workflows.py demo/activities.py >/dev/null 2>&1
-	@cd demo && rm -f charges.txt
-	@echo "🚀 Starting backend (FastAPI + Worker) and frontend..."
+	@echo "🍕 Starting backend (FastAPI + Worker) and frontend..."
 	@bash -c 'trap "kill 0" EXIT; cd demo && uv run api.py & cd demo/frontend && npm run dev & wait'
 
 # Run just the backend (FastAPI + Temporal worker)

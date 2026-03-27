@@ -75,7 +75,7 @@
 
 *   **Transition:** "Enough slides. We've seen the rules, now let's see what happens when we break them. I asked Copilot to write me a pizza delivery workflow. It looks perfectly fine to a standard Python developer. Let's run it and see what happens."
 
-**[🎬 SCREEN SWITCH: Run `just broken`, open Pizza UI at localhost:3000, open Temporal UI at localhost:8233]**
+**[🎬 SCREEN SWITCH: Run `just demo`, open Pizza UI at localhost:3000, open Temporal UI at localhost:8233]**
 
 *   **Place an order** through the Pizza UI so the audience can see a named workflow in the Temporal UI.
 
@@ -84,8 +84,11 @@
 *   The workflow immediately fails. Show the error in the Temporal Web UI: `RestrictedWorkflowAccessError: Cannot access uuid.uuid4.__call__`
 *   "Temporal's Python SDK includes a sandbox that catches non-deterministic calls before they even run. It saw `uuid.uuid4()` and blocked it. This is Temporal protecting you."
 *   Ask the audience: *"How would you fix this?"*
-*   Explain: `uuid.uuid4()` generates a random value. If the workflow replays, it would generate a different value, breaking determinism. Temporal provides `workflow.uuid4()` which is seeded from the event history -- same value on every replay.
-*   **Do the fix live:** Replace `uuid.uuid4()` with `workflow.uuid4()`, and remove the `import uuid` line.
+*   Explain: `uuid.uuid4()` generates a random value. If the workflow replays, it would generate a different value, breaking determinism. We can use `workflow.info().workflow_id` instead -- it's deterministic and matches what's visible in the Temporal UI.
+*   **Do the fix live:** In `workflows.py`:
+    1. Comment out `order_id = str(uuid.uuid4())`
+    2. Uncomment `order_id = workflow.info().workflow_id`
+    3. Delete the `import uuid` line at the top
 *   Save the file -- uvicorn auto-reloads, the worker picks up the change, and the workflow starts progressing.
 
 ### Bug 2: The Idempotency Bug
@@ -93,10 +96,9 @@
 *   The workflow is progressing now. But look at the **Payment Ledger** panel in the Pizza UI.
 *   The `charge_customer` activity randomly fails 75% of the time. On retries, it writes another charge with the same order ID.
 *   "Look at the ledger -- the same order ID appears 3, 4, 5 times. The customer just got charged $75 for a $15 pizza. This is the #1 production bug in Temporal applications."
-*   **Do the fix live:** Open `activities.py`. Add an idempotency check at the top of `charge_customer`: read `charges.txt`, check if the order ID is already there, return immediately if so.
-*   The commented-out code in the file shows exactly what to uncomment.
-
-*   **The Payoff:** Run `just fixed`. Place another order. Show the Payment Ledger -- exactly one charge per order, even though the activity still fails and retries. The idempotency check skips the duplicate writes.
+*   **Do the fix live:** In `activities.py`, uncomment the idempotency check block at the top of `charge_customer` (the `try/except` block that checks if the order ID already exists in `charges.txt`).
+*   Save the file -- uvicorn auto-reloads. Place another order.
+*   **The Payoff:** The Payment Ledger shows exactly one charge per order, even though the activity still fails and retries. The idempotency check skips the duplicate writes.
 
 **[🎬 SCREEN SWITCH: Switch screen share back to Presentation Slides]**
 
