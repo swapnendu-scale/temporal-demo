@@ -79,32 +79,24 @@
 
 *   **Place an order** through the Pizza UI so the audience can see a named workflow in the Temporal UI.
 
-### Bug 1: The Sandbox Restriction
+### Bug 1: The Determinism Bug
 
 *   The workflow immediately fails. Show the error in the Temporal Web UI: `RestrictedWorkflowAccessError: Cannot access uuid.uuid4.__call__`
-*   "Temporal's Python SDK includes a sandbox that catches non-deterministic calls before they even run. It saw `uuid.uuid4()` and blocked it."
+*   "Temporal's Python SDK includes a sandbox that catches non-deterministic calls before they even run. It saw `uuid.uuid4()` and blocked it. This is Temporal protecting you."
 *   Ask the audience: *"How would you fix this?"*
-*   Someone will likely suggest moving the import into `workflow.unsafe.imports_passed_through()`.
-*   **Do the naive fix live:** Move `import uuid` into the `with workflow.unsafe.imports_passed_through()` block.
-*   "The error is gone! The workflow starts processing. But we just told Temporal to trust us that this import is deterministic. Did we just lie to Temporal?"
+*   Explain: `uuid.uuid4()` generates a random value. If the workflow replays, it would generate a different value, breaking determinism. Temporal provides `workflow.uuid4()` which is seeded from the event history -- same value on every replay.
+*   **Do the fix live:** Replace `uuid.uuid4()` with `workflow.uuid4()`, and remove the `import uuid` line.
+*   Save the file -- uvicorn auto-reloads, the worker picks up the change, and the workflow starts progressing.
 
-### Bug 2: The Non-Determinism
+### Bug 2: The Idempotency Bug
 
-*   The workflow runs fine on the first execution. But restart the worker (Ctrl+C and re-run).
-*   Now the workflow replays. On replay, `uuid.uuid4()` generates a *different* UUID. The replay diverges.
-*   Show the `NonDeterministicWorkflowError` in the Temporal UI.
-*   "This is the real danger of bypassing the sandbox. The code works once, passes your local tests, and then breaks in production when Temporal tries to replay."
-*   **Do the real fix live:** Replace `uuid.uuid4()` with `workflow.uuid4()`.
-*   "Temporal's `workflow.uuid4()` generates a UUID that is seeded from the workflow history. On replay, it returns the same value. This is deterministic."
+*   The workflow is progressing now. But look at the **Payment Ledger** panel in the Pizza UI.
+*   The `charge_customer` activity randomly fails 75% of the time. On retries, it writes another charge with the same order ID.
+*   "Look at the ledger -- the same order ID appears 3, 4, 5 times. The customer just got charged $75 for a $15 pizza. This is the #1 production bug in Temporal applications."
+*   **Do the fix live:** Open `activities.py`. Add an idempotency check at the top of `charge_customer`: read `charges.txt`, check if the order ID is already there, return immediately if so.
+*   The commented-out code in the file shows exactly what to uncomment.
 
-### Bug 3: The Idempotency Bug
-
-*   The workflow is progressing now. But look at `charges.txt` (or `cat demo/charges.txt`).
-*   The `charge_customer` activity randomly fails 50% of the time. On retries, it writes another charge.
-*   "The customer just got charged 3 times for one pizza. This is the #1 production bug in Temporal applications."
-*   **Do the fix live:** Pass `order_id` to the activity. Add an idempotency check at the top: if the order ID is already in the file, return immediately.
-
-*   **The Payoff:** Run `just fixed`. Place another order. Show the workflow completing cleanly end-to-end. Show `charges.txt` has exactly one entry per order.
+*   **The Payoff:** Run `just fixed`. Place another order. Show the Payment Ledger -- exactly one charge per order, even though the activity still fails and retries. The idempotency check skips the duplicate writes.
 
 **[🎬 SCREEN SWITCH: Switch screen share back to Presentation Slides]**
 

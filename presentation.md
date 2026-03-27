@@ -123,29 +123,25 @@ flowchart LR
 **[🎬 CUE: Presenter switches to IDE and Terminal]**
 
 **The Setup:**
-We will now run the workflow we just discussed. It contains three intentional, very common bugs. **This is exactly the kind of code an LLM will generate by default if you don't prompt it carefully.**
+We will now run the workflow we just discussed. It contains two intentional, very common bugs. **This is exactly the kind of code an LLM will generate by default if you don't prompt it carefully.**
 
 **[🎬 CUE: Presenter runs `just broken` and opens the Pizza UI]**
 **[🎬 CUE: Presenter places an order through the UI, then switches to Temporal Web UI]**
 
-### Bug 1: The Sandbox Restriction (`RestrictedWorkflowAccessError`)
-- The workflow uses `import uuid` at the top of the file and calls `uuid.uuid4()` inside the workflow.
+### Bug 1: The Determinism Bug (`RestrictedWorkflowAccessError`)
+- The workflow uses `uuid.uuid4()` to generate an order ID inside the workflow code.
 - Temporal's Python SDK has a **sandbox** that detects non-deterministic calls and blocks them immediately.
 - The workflow fails with: `RestrictedWorkflowAccessError: Cannot access uuid.uuid4.__call__ from inside a workflow.`
-- **The Naive Fix (and why it's dangerous):** Someone might say "just move the import into `workflow.unsafe.imports_passed_through()`". This bypasses the sandbox -- the error disappears, and the workflow appears to work. But we have just silenced a safety mechanism.
+- **The Fix:** Replace `uuid.uuid4()` with `workflow.uuid4()`, which returns a deterministic UUID seeded from the workflow's event history. On replay, it returns the same value.
 
-### Bug 2: The Non-Determinism (`NonDeterministicWorkflowError`)
-- After bypassing the sandbox, `uuid.uuid4()` runs fine the first time. But when the workflow replays (e.g., after the worker restarts), it generates a *different* UUID, causing the replay to diverge.
-- The workflow now fails with: `NonDeterministicWorkflowError`
-- **The Real Fix:** Replace `uuid.uuid4()` with `workflow.uuid4()`, which returns a deterministic UUID seeded from the workflow's event history.
+### Bug 2: The Idempotency Bug (Double Charging)
+- After fixing Bug 1, the workflow runs. But look at the **Payment Ledger** in the UI.
+- The `charge_customer` activity writes the charge to `charges.txt` and randomly fails 75% of the time. When Temporal retries it, the same order ID gets charged again.
+- The ledger shows the same order ID appearing multiple times -- the customer is being double-charged!
+- **The Fix:** Add an idempotency check at the top of the activity: if the order ID is already in `charges.txt`, return immediately without writing.
 
-### Bug 3: The Idempotency Bug (Double Charging)
-- The `charge_customer` activity blindly appends to `charges.txt` and randomly fails 50% of the time.
-- When Temporal retries the activity, the customer gets charged again. Check `charges.txt` to see duplicate entries.
-- **The Fix:** Pass the `order_id` to the activity and check if it was already processed before writing.
-
-**[🎬 CUE: Presenter live-fixes the code, restarts with `just fixed`]**
-- Show how Temporal seamlessly recovers and continues exactly where it left off without losing data.
+**[🎬 CUE: Presenter live-fixes the code, then runs `just fixed` to show the clean version]**
+- Show how the Payment Ledger now has exactly one charge per order, even though the activity still fails and retries.
 
 ---
 
