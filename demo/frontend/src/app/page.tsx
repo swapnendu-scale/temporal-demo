@@ -43,6 +43,18 @@ interface Order {
   status: string;
 }
 
+interface ChargeEntry {
+  line: string;
+  amount: number;
+  order_id: string | null;
+}
+
+interface ChargesData {
+  entries: ChargeEntry[];
+  total: number;
+  count: number;
+}
+
 function StageProgress({ currentStage }: { currentStage: string }) {
   const currentIdx = STAGES.indexOf(currentStage);
   return (
@@ -130,8 +142,74 @@ function OrderCard({ order }: { order: Order }) {
   );
 }
 
+function ChargeLedger({ charges }: { charges: ChargesData }) {
+  if (charges.entries.length === 0) return null;
+
+  const hasDuplicates = charges.entries.some((e) => !e.order_id);
+  const uniqueOrderIds = new Set(charges.entries.filter((e) => e.order_id).map((e) => e.order_id));
+  const expectedTotal = charges.entries.length > 0
+    ? (uniqueOrderIds.size > 0 ? charges.entries.filter((e) => e.order_id).reduce((sum, e, _, arr) => {
+        const first = arr.find((a) => a.order_id === e.order_id);
+        return first === e ? sum + e.amount : sum;
+      }, 0) : charges.entries[0].amount)
+    : 0;
+  const overcharged = hasDuplicates && charges.count > 1;
+
+  return (
+    <div className={`rounded-2xl border p-5 transition-all ${
+      overcharged ? "border-red-300 bg-red-50" : "border-stone-200 bg-white shadow-sm"
+    }`}>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-lg font-bold text-stone-900">
+          Payment Ledger
+        </h2>
+        {overcharged && (
+          <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-red-100 text-red-700 animate-pulse">
+            DUPLICATE CHARGES
+          </span>
+        )}
+      </div>
+
+      <div className="space-y-1.5 mb-3">
+        {charges.entries.map((entry, i) => (
+          <div
+            key={i}
+            className={`flex items-center justify-between text-sm px-3 py-2 rounded-lg ${
+              !entry.order_id
+                ? "bg-red-100 text-red-800 border border-red-200"
+                : "bg-stone-50 text-stone-700"
+            }`}
+          >
+            <span className="font-mono text-xs flex-1 truncate mr-2">
+              {entry.order_id
+                ? `Order ${entry.order_id.slice(0, 8)}...`
+                : `Charge #${i + 1} (no order ID)`}
+            </span>
+            <span className="font-semibold tabular-nums">${entry.amount}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className={`flex items-center justify-between pt-3 border-t text-sm font-bold ${
+        overcharged ? "border-red-200 text-red-700" : "border-stone-200 text-stone-900"
+      }`}>
+        <span>Total Charged</span>
+        <span className="tabular-nums text-base">
+          ${charges.total}
+          {overcharged && (
+            <span className="text-xs font-normal ml-1.5 text-red-500">
+              (should be ${expectedTotal})
+            </span>
+          )}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [charges, setCharges] = useState<ChargesData>({ entries: [], total: 0, count: 0 });
   const [customerName, setCustomerName] = useState("");
   const [pizzaType, setPizzaType] = useState(PIZZA_MENU[0].name);
   const [address, setAddress] = useState("");
@@ -149,11 +227,26 @@ export default function Home() {
     }
   }, []);
 
+  const fetchCharges = useCallback(async () => {
+    try {
+      const res = await fetch(`${API}/charges`);
+      if (res.ok) {
+        setCharges(await res.json());
+      }
+    } catch {
+      // backend not ready yet
+    }
+  }, []);
+
   useEffect(() => {
     fetchOrders();
-    const interval = setInterval(fetchOrders, 2000);
+    fetchCharges();
+    const interval = setInterval(() => {
+      fetchOrders();
+      fetchCharges();
+    }, 2000);
     return () => clearInterval(interval);
-  }, [fetchOrders]);
+  }, [fetchOrders, fetchCharges]);
 
   const selectedPizza = PIZZA_MENU.find((p) => p.name === pizzaType)!;
 
@@ -210,9 +303,9 @@ export default function Home() {
       </header>
 
       <main className="flex-1 max-w-5xl mx-auto w-full p-6 grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-8">
-        {/* Order Form */}
-        <div>
-          <div className="bg-white rounded-2xl border border-stone-200 shadow-sm p-6 sticky top-6">
+        {/* Order Form + Charge Ledger */}
+        <div className="space-y-6">
+          <div className="bg-white rounded-2xl border border-stone-200 shadow-sm p-6">
             <h2 className="text-lg font-bold text-stone-900 mb-4">
               Place an Order
             </h2>
@@ -288,6 +381,9 @@ export default function Home() {
               </button>
             </form>
           </div>
+
+          {/* Payment Ledger */}
+          <ChargeLedger charges={charges} />
         </div>
 
         {/* Order Tracker */}

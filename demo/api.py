@@ -164,6 +164,47 @@ async def get_order(workflow_id: str):
     )
 
 
+class ChargeEntry(BaseModel):
+    line: str
+    amount: int
+    order_id: str | None
+
+
+class ChargesResponse(BaseModel):
+    entries: list[ChargeEntry]
+    total: int
+    count: int
+
+
+@app.get("/charges", response_model=ChargesResponse)
+async def get_charges():
+    entries = []
+    try:
+        with open("charges.txt", "r") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                amount = 0
+                order_id = None
+                if line.startswith("Order "):
+                    parts = line.split(": Charged $")
+                    if len(parts) == 2:
+                        order_id = parts[0].replace("Order ", "")
+                        amount = int(parts[1])
+                elif line.startswith("Charged $"):
+                    amount = int(line.replace("Charged $", ""))
+                entries.append(ChargeEntry(line=line, amount=amount, order_id=order_id))
+    except FileNotFoundError:
+        pass
+
+    return ChargesResponse(
+        entries=entries,
+        total=sum(e.amount for e in entries),
+        count=len(entries),
+    )
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("api:app", host="0.0.0.0", port=8000, reload=True)
