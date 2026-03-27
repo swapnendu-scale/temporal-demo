@@ -33,20 +33,17 @@ class PizzaOrderWorkflow:
 
     @workflow.run
     async def process_order(self, customer_name: str, pizza_type: str, address: str, amount: int) -> str:
-        # FIXED: workflow.uuid4() is deterministic across replays
-        order_id = str(workflow.uuid4())
+        order_id = str(uuid.uuid4())
 
         workflow.logger.info(f"Starting pizza order {order_id} for {customer_name}")
 
-        # 1. Charge the customer
         self._stage = "charging"
         await workflow.execute_activity(
             charge_customer,
-            args=[amount, order_id],
+            amount,
             start_to_close_timeout=timedelta(seconds=30),
         )
 
-        # 2. Send to Kitchen (Child Workflow: prep -> bake -> box)
         self._stage = "kitchen"
         await workflow.execute_child_workflow(
             KitchenWorkflow.prepare_food,
@@ -54,7 +51,6 @@ class PizzaOrderWorkflow:
             id=f"kitchen-{order_id}",
         )
 
-        # 3. Deliver the pizza
         self._stage = "delivering"
         await workflow.execute_activity(
             deliver_order,
