@@ -1,5 +1,3 @@
-import uuid  # BUG 1: uuid.uuid4() is non-deterministic and blocked by Temporal's sandbox.
-              # FIX: Remove this import and use workflow.uuid4() instead.
 from datetime import timedelta
 from temporalio import workflow
 
@@ -34,9 +32,7 @@ class PizzaOrderWorkflow:
 
     @workflow.run
     async def process_order(self, customer_name: str, pizza_type: str, address: str, amount: int) -> str:
-        # BUG 1: uuid.uuid4() is non-deterministic — Temporal's sandbox blocks it.
-        # FIX: Replace with workflow.uuid4() which is deterministic across replays.
-        order_id = str(uuid.uuid4())
+        order_id = str(workflow.uuid4())
 
         workflow.logger.info(f"Starting pizza order {order_id} for {customer_name}")
 

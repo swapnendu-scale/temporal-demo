@@ -4,15 +4,13 @@ from temporalio import activity
 
 @activity.defn
 async def charge_customer(amount: int, order_id: str) -> str:
-    # BUG 2: No idempotency check. If this activity fails and Temporal retries it,
-    # another charge is appended — the customer gets double-charged.
-    # FIX: Check if order_id is already in charges.txt before writing.
-    # try:
-    #     with open("charges.txt", "r") as f:
-    #         if f"Order {order_id}" in f.read():
-    #             return f"Already charged ${amount} for {order_id}"
-    # except FileNotFoundError:
-    #     pass
+    try:
+        with open("charges.txt", "r") as f:
+            if f"Order {order_id}" in f.read():
+                return f"Already charged ${amount} for {order_id}"
+    except FileNotFoundError:
+        pass
+
     with open("charges.txt", "a") as f:
         f.write(f"Order {order_id}: Charged ${amount}\n")
 
