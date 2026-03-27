@@ -3,14 +3,24 @@ from datetime import timedelta
 from temporalio import workflow
 
 with workflow.unsafe.imports_passed_through():
-    from activities import charge_customer, bake_pizza, deliver_order
+    from activities import charge_customer, prep_ingredients, bake_pizza, box_order, deliver_order
 
 @workflow.defn
 class KitchenWorkflow:
     @workflow.run
     async def prepare_food(self, pizza_type: str) -> str:
-        result = await workflow.execute_activity(
+        await workflow.execute_activity(
+            prep_ingredients,
+            pizza_type,
+            start_to_close_timeout=timedelta(seconds=30),
+        )
+        await workflow.execute_activity(
             bake_pizza,
+            pizza_type,
+            start_to_close_timeout=timedelta(seconds=30),
+        )
+        result = await workflow.execute_activity(
+            box_order,
             pizza_type,
             start_to_close_timeout=timedelta(seconds=30),
         )
@@ -36,7 +46,7 @@ class PizzaOrderWorkflow:
             start_to_close_timeout=timedelta(seconds=30),
         )
 
-        # 2. Send to Kitchen (Child Workflow)
+        # 2. Send to Kitchen (Child Workflow: prep -> bake -> box)
         self._stage = "kitchen"
         await workflow.execute_child_workflow(
             KitchenWorkflow.prepare_food,

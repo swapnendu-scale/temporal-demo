@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from temporalio.client import Client, WorkflowExecutionStatus
 from temporalio.worker import Worker
 
-from activities import charge_customer, bake_pizza, deliver_order
+from activities import charge_customer, prep_ingredients, bake_pizza, box_order, deliver_order
 from workflows import PizzaOrderWorkflow, KitchenWorkflow
 
 TASK_QUEUE = "pizza-tasks"
@@ -31,7 +31,7 @@ async def lifespan(app: FastAPI):
         temporal_client,
         task_queue=TASK_QUEUE,
         workflows=[PizzaOrderWorkflow, KitchenWorkflow],
-        activities=[charge_customer, bake_pizza, deliver_order],
+        activities=[charge_customer, prep_ingredients, bake_pizza, box_order, deliver_order],
     )
     worker_task = asyncio.create_task(worker.run())
     print(f"Worker listening on task queue '{TASK_QUEUE}'...")

@@ -24,10 +24,22 @@ async def charge_customer(amount: int, order_id: str) -> str:
     return f"Successfully charged ${amount}"
 
 @activity.defn
+async def prep_ingredients(pizza_type: str) -> str:
+    """Simulates prepping dough, sauce, and toppings."""
+    time.sleep(random.uniform(2, 4))
+    return f"Prepped ingredients for {pizza_type}"
+
+@activity.defn
 async def bake_pizza(pizza_type: str) -> str:
     """Simulates baking a pizza in the oven."""
     time.sleep(random.uniform(5, 8))
     return f"Baked a delicious {pizza_type} pizza"
+
+@activity.defn
+async def box_order(pizza_type: str) -> str:
+    """Simulates boxing the pizza and adding sides."""
+    time.sleep(random.uniform(1, 2))
+    return f"Boxed {pizza_type} pizza for delivery"
 
 @activity.defn
 async def deliver_order(address: str) -> str:
