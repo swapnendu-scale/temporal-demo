@@ -5,7 +5,7 @@ server:
 # Run the broken version of the demo
 broken: _ensure-server
 	@echo "🍕 Setting up BROKEN demo..."
-	git checkout 474f582 -- demo/workflows.py demo/activities.py
+	git checkout 46efa35 -- demo/workflows.py demo/activities.py
 	-@git reset HEAD demo/workflows.py demo/activities.py >/dev/null 2>&1
 	@cd demo && rm -f charges.txt
 	@echo "🚀 Starting backend (FastAPI + Worker) and frontend..."
@@ -14,7 +14,7 @@ broken: _ensure-server
 # Run the fixed version of the demo
 fixed: _ensure-server
 	@echo "🍕 Setting up FIXED demo..."
-	git checkout 87fcfcf -- demo/workflows.py demo/activities.py
+	git checkout 44fcd38 -- demo/workflows.py demo/activities.py
 	-@git reset HEAD demo/workflows.py demo/activities.py >/dev/null 2>&1
 	@cd demo && rm -f charges.txt
 	@echo "🚀 Starting backend (FastAPI + Worker) and frontend..."

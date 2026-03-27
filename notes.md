@@ -35,12 +35,12 @@
 **[🎬 SCREEN SWITCH: Switch screen share to IDE (Cursor/VSCode)]**
 
 *   **Transition:** "Before we talk about the rules of Temporal, let's look at the code we will be using today."
-*   **The Scenario:** "We have a relatable scenario: A Pizza Delivery App."
+*   **The Scenario:** "We have a relatable scenario: A Pizza Delivery App with a full web UI."
 *   **The Code:** Show them `demo/workflows.py` and `demo/activities.py`.
     *   `PizzaOrderWorkflow`: The main orchestrator.
     *   `KitchenWorkflow`: A child workflow for preparing the food.
-    *   `charge_customer`, `bake_pizza`, `deliver_order`: The activities.
-*   "Don't worry about the bugs in here yet. Just understand the flow: Charge -> Kitchen -> Deliver."
+    *   `charge_customer`, `prep_ingredients`, `bake_pizza`, `box_order`, `deliver_order`: The activities.
+*   "Don't worry about the bugs in here yet. Just understand the flow: Charge -> Kitchen (Prep -> Bake -> Box) -> Deliver."
 
 **[🎬 SCREEN SWITCH: Switch screen share back to Presentation Slides]**
 
@@ -73,33 +73,38 @@
 
 ## 5. Interactive Live Debugging Demo (20 mins)
 
-*   **Transition:** "Enough slides. We've seen the rules, now let's see what happens when we break them. By the way, the code I'm about to show you is the exact code Copilot generated for me when I asked it to write a pizza delivery workflow. It looks perfectly fine to a standard Python developer, right? Let's see what happens when we run it."
+*   **Transition:** "Enough slides. We've seen the rules, now let's see what happens when we break them. I asked Copilot to write me a pizza delivery workflow. It looks perfectly fine to a standard Python developer. Let's run it and see what happens."
 
-**[🎬 SCREEN SWITCH: Switch screen share to IDE (Cursor/VSCode)]**
+**[🎬 SCREEN SWITCH: Run `just broken`, open Pizza UI at localhost:3000, open Temporal UI at localhost:8233]**
 
-*   **The Bugs:**
-    *   Open `demo/workflows.py`. Point out `uuid.uuid4()` in the workflow. Ask the audience: *"Why is this bad?"* (Answer: Non-deterministic).
-    *   Open `demo/activities.py`. Point out the `charge_customer` activity that writes to a file and randomly fails. Ask: *"What happens when Temporal retries this?"* (Answer: Duplicate charges).
+*   **Place an order** through the Pizza UI so the audience can see a named workflow in the Temporal UI.
 
-**[🎬 SCREEN SWITCH: Switch screen share to Terminal]**
+### Bug 1: The Sandbox Restriction
 
-*   **The Run:**
-    *   `cd demo`
-    *   Run `uv run worker.py` in one tab.
-    *   Run `uv run starter.py` in another tab.
+*   The workflow immediately fails. Show the error in the Temporal Web UI: `RestrictedWorkflowAccessError: Cannot access uuid.uuid4.__call__`
+*   "Temporal's Python SDK includes a sandbox that catches non-deterministic calls before they even run. It saw `uuid.uuid4()` and blocked it."
+*   Ask the audience: *"How would you fix this?"*
+*   Someone will likely suggest moving the import into `workflow.unsafe.imports_passed_through()`.
+*   **Do the naive fix live:** Move `import uuid` into the `with workflow.unsafe.imports_passed_through()` block.
+*   "The error is gone! The workflow starts processing. But we just told Temporal to trust us that this import is deterministic. Did we just lie to Temporal?"
 
-**[🎬 SCREEN SWITCH: Switch screen share to Temporal Web UI (localhost:8233)]**
+### Bug 2: The Non-Determinism
 
-*   **The Investigation:**
-    *   Show them the `NonDeterministicWorkflowError` in the UI. Explain how to read the Event History.
-    *   Show them the activity retrying and the `charges.txt` file filling up with duplicate charges.
+*   The workflow runs fine on the first execution. But restart the worker (Ctrl+C and re-run).
+*   Now the workflow replays. On replay, `uuid.uuid4()` generates a *different* UUID. The replay diverges.
+*   Show the `NonDeterministicWorkflowError` in the Temporal UI.
+*   "This is the real danger of bypassing the sandbox. The code works once, passes your local tests, and then breaks in production when Temporal tries to replay."
+*   **Do the real fix live:** Replace `uuid.uuid4()` with `workflow.uuid4()`.
+*   "Temporal's `workflow.uuid4()` generates a UUID that is seeded from the workflow history. On replay, it returns the same value. This is deterministic."
 
-**[🎬 SCREEN SWITCH: Switch screen share back to IDE]**
+### Bug 3: The Idempotency Bug
 
-*   **The Fix:**
-    *   Live-code the fix. Move the UUID generation to an activity (or use Temporal's deterministic UUID).
-    *   Add a check in the activity to prevent duplicate writes.
-    *   Show how Temporal immediately recovers and finishes the workflow.
+*   The workflow is progressing now. But look at `charges.txt` (or `cat demo/charges.txt`).
+*   The `charge_customer` activity randomly fails 50% of the time. On retries, it writes another charge.
+*   "The customer just got charged 3 times for one pizza. This is the #1 production bug in Temporal applications."
+*   **Do the fix live:** Pass `order_id` to the activity. Add an idempotency check at the top: if the order ID is already in the file, return immediately.
+
+*   **The Payoff:** Run `just fixed`. Place another order. Show the workflow completing cleanly end-to-end. Show `charges.txt` has exactly one entry per order.
 
 **[🎬 SCREEN SWITCH: Switch screen share back to Presentation Slides]**
 

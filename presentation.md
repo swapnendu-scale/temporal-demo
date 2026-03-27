@@ -48,13 +48,13 @@ To keep this session practical and actionable, we are intentionally skipping:
 
 **[🎬 CUE: Presenter switches to IDE to show the code structure]**
 
-To explain these concepts, we are going to look at a very simple, relatable scenario: **Charging a Customer.**
+To explain these concepts, we are going to look at a very simple, relatable scenario: **A Pizza Delivery App.**
 
-We have a Temporal project with two main files in the `demo/` directory:
-1. `demo/workflows.py`: Contains `CustomerProcessingWorkflow`. This is the orchestrator that decides to charge the customer.
-2. `demo/activities.py`: Contains `charge_customer`. This is the function that actually talks to the payment gateway (simulated by writing to a file) and can randomly fail due to "network errors".
+We have a full-stack demo in the `demo/` directory with a web UI for placing orders and a Temporal backend:
+1. `demo/workflows.py`: Contains `PizzaOrderWorkflow` (the main orchestrator) and `KitchenWorkflow` (a child workflow).
+2. `demo/activities.py`: Contains `charge_customer`, `prep_ingredients`, `bake_pizza`, `box_order`, and `deliver_order`. These simulate real work with delays and random failures.
 
-We will use this code to explain the core concepts, and then we will run it live to see what happens when things go wrong.
+The flow is: **Charge -> Kitchen (Prep -> Bake -> Box) -> Deliver**. We will use this code to explain the core concepts, and then we will run it live to see what happens when things go wrong.
 
 **[🎬 CUE: Presenter switches back to Presentation Slides]**
 
@@ -123,23 +123,28 @@ flowchart LR
 **[🎬 CUE: Presenter switches to IDE and Terminal]**
 
 **The Setup:**
-We will now run the workflow we just discussed. It contains two intentional, very common bugs. **In fact, this is exactly the kind of code an LLM will generate by default if you don't prompt it carefully:**
-1. **The Determinism Bug:** An API call made directly inside the workflow code.
-2. **The Idempotency Bug:** A failing activity that charges a customer without checking if they were already charged.
+We will now run the workflow we just discussed. It contains three intentional, very common bugs. **This is exactly the kind of code an LLM will generate by default if you don't prompt it carefully.**
 
-**[🎬 CUE: Presenter runs the worker and starter scripts]**
-**[🎬 CUE: Presenter switches to Temporal Web UI]**
+**[🎬 CUE: Presenter runs `just broken` and opens the Pizza UI]**
+**[🎬 CUE: Presenter places an order through the UI, then switches to Temporal Web UI]**
 
-**The Investigation:**
-- We will open the Temporal Web UI together.
-- Look at the Event History.
-- Identify the `NonDeterministicWorkflowError`.
-- Identify the activity retry loop.
+### Bug 1: The Sandbox Restriction (`RestrictedWorkflowAccessError`)
+- The workflow uses `import uuid` at the top of the file and calls `uuid.uuid4()` inside the workflow.
+- Temporal's Python SDK has a **sandbox** that detects non-deterministic calls and blocks them immediately.
+- The workflow fails with: `RestrictedWorkflowAccessError: Cannot access uuid.uuid4.__call__ from inside a workflow.`
+- **The Naive Fix (and why it's dangerous):** Someone might say "just move the import into `workflow.unsafe.imports_passed_through()`". This bypasses the sandbox -- the error disappears, and the workflow appears to work. But we have just silenced a safety mechanism.
 
-**[🎬 CUE: Presenter switches back to IDE]**
+### Bug 2: The Non-Determinism (`NonDeterministicWorkflowError`)
+- After bypassing the sandbox, `uuid.uuid4()` runs fine the first time. But when the workflow replays (e.g., after the worker restarts), it generates a *different* UUID, causing the replay to diverge.
+- The workflow now fails with: `NonDeterministicWorkflowError`
+- **The Real Fix:** Replace `uuid.uuid4()` with `workflow.uuid4()`, which returns a deterministic UUID seeded from the workflow's event history.
 
-**The Fix:**
-- Live fix the code (moving the API call to an activity, adding an idempotency key).
+### Bug 3: The Idempotency Bug (Double Charging)
+- The `charge_customer` activity blindly appends to `charges.txt` and randomly fails 50% of the time.
+- When Temporal retries the activity, the customer gets charged again. Check `charges.txt` to see duplicate entries.
+- **The Fix:** Pass the `order_id` to the activity and check if it was already processed before writing.
+
+**[🎬 CUE: Presenter live-fixes the code, restarts with `just fixed`]**
 - Show how Temporal seamlessly recovers and continues exactly where it left off without losing data.
 
 ---
