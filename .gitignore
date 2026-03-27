@@ -9,3 +9,6 @@ wheels/
 # Virtual environments
 .venv
 broken/
+demo/frontend/node_modules/
+demo/frontend/.next/
+demo/charges.txt
