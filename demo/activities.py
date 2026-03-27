@@ -3,9 +3,16 @@ import time
 from temporalio import activity
 
 @activity.defn
-async def charge_customer(amount: int) -> str:
+async def charge_customer(amount: int, order_id: str) -> str:
+    try:
+        with open("charges.txt", "r") as f:
+            if f"Order {order_id}" in f.read():
+                return f"Already charged ${amount} for {order_id}"
+    except FileNotFoundError:
+        pass
+
     with open("charges.txt", "a") as f:
-        f.write(f"Charged ${amount}\n")
+        f.write(f"Order {order_id}: Charged ${amount}\n")
 
     time.sleep(random.uniform(2, 3))
 

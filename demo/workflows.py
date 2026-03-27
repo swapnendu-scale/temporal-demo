@@ -1,4 +1,3 @@
-import uuid
 from datetime import timedelta
 from temporalio import workflow
 
@@ -33,14 +32,14 @@ class PizzaOrderWorkflow:
 
     @workflow.run
     async def process_order(self, customer_name: str, pizza_type: str, address: str, amount: int) -> str:
-        order_id = str(uuid.uuid4())
+        order_id = str(workflow.uuid4())
 
         workflow.logger.info(f"Starting pizza order {order_id} for {customer_name}")
 
         self._stage = "charging"
         await workflow.execute_activity(
             charge_customer,
-            amount,
+            args=[amount, order_id],
             start_to_close_timeout=timedelta(seconds=30),
         )
 
