@@ -2,23 +2,31 @@
 server:
 	temporal server start-dev
 
-# Run the broken version of the demo (requires `just server` in another terminal)
+# Run the broken version of the demo
 broken: _ensure-server
-	@echo "🍕 Setting up broken demo..."
-	git checkout 03b0038 -- demo/workflows.py demo/activities.py
+	@echo "🍕 Setting up BROKEN demo..."
+	git checkout a5d25c7 -- demo/workflows.py demo/activities.py
 	-@git reset HEAD demo/workflows.py demo/activities.py >/dev/null 2>&1
 	@cd demo && rm -f charges.txt
-	@echo "🚀 Starting Temporal worker and triggering workflow..."
-	@bash -c 'trap "kill 0" EXIT; cd demo && uv run worker.py & sleep 2 && cd demo && uv run starter.py && echo "⏳ Worker is running. Press Ctrl+C to stop." && wait'
+	@echo "🚀 Starting backend (FastAPI + Worker) and frontend..."
+	@bash -c 'trap "kill 0" EXIT; cd demo && uv run api.py & cd demo/frontend && npm run dev & wait'
 
-# Run the fixed version of the demo (requires `just server` in another terminal)
+# Run the fixed version of the demo
 fixed: _ensure-server
-	@echo "🍕 Setting up fixed demo..."
-	git checkout 8529623 -- demo/workflows.py demo/activities.py
+	@echo "🍕 Setting up FIXED demo..."
+	git checkout 2efa1d4 -- demo/workflows.py demo/activities.py
 	-@git reset HEAD demo/workflows.py demo/activities.py >/dev/null 2>&1
 	@cd demo && rm -f charges.txt
-	@echo "🚀 Starting Temporal worker and triggering workflow..."
-	@bash -c 'trap "kill 0" EXIT; cd demo && uv run worker.py & sleep 2 && cd demo && uv run starter.py && echo "⏳ Worker is running. Press Ctrl+C to stop." && wait'
+	@echo "🚀 Starting backend (FastAPI + Worker) and frontend..."
+	@bash -c 'trap "kill 0" EXIT; cd demo && uv run api.py & cd demo/frontend && npm run dev & wait'
+
+# Run just the backend (FastAPI + Temporal worker)
+backend: _ensure-server
+	cd demo && uv run api.py
+
+# Run just the frontend
+frontend:
+	cd demo/frontend && npm run dev
 
 [private]
 _ensure-server:
