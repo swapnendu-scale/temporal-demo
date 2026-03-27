@@ -98,7 +98,7 @@ async def create_order(req: OrderRequest):
 @app.get("/orders", response_model=list[OrderResponse])
 async def list_orders():
     orders = []
-    async for wf in temporal_client.list_workflows('WorkflowType = "PizzaOrderWorkflow" ORDER BY StartTime DESC'):
+    async for wf in temporal_client.list_workflows('WorkflowType = "PizzaOrderWorkflow"'):
         stage = "unknown"
         status_name = wf.status.name if wf.status else "UNKNOWN"
 
